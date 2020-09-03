@@ -2,6 +2,7 @@ import {__production__ } from "./constants"
 import { MikroORM } from '@mikro-orm/core'
 import {Post} from './entities/Posts'
 import path from 'path'
+import { User } from "./entities/User";
 
 export default {
     migrations:{
@@ -11,7 +12,7 @@ export default {
     user:"Harle",
     password:"root",
         dbName: "forum",
-        entities:[Post],
+        entities:[Post, User],
         type: "postgresql",
         debug: !__production__,
     }as Parameters<typeof MikroORM.init>[0];
