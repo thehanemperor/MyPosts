@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { MikroORM, EntityManager } from "@mikro-orm/core";
+import { MikroORM, } from "@mikro-orm/core";
 import {__production__ } from './constants';
 import microConfig from "./mikro-orm.config";
 import express from "express";
@@ -8,20 +8,51 @@ import { buildSchema } from "type-graphql";
 import { HelloResolver } from "./resolvers/hello";
 import { PostResolver } from "./resolvers/post";
 import { UserResolver } from "./resolvers/user"
-import { Post } from "./entities/Posts";
+import redis from 'redis'
+import session from 'express-session'
+import connectRedis from 'connect-redis'
+import { MyContext } from "./types";
 const main = async ()=> {
-    
+
+   
     const orm = await MikroORM.init(microConfig);
     await orm.getMigrator().up();
  
     const app = express()
+
+    const RedisStore = connectRedis(session)
+    const redisClient = redis.createClient()
+    
+    // session need to come before apollo middleware
+    app.use(
+        session({
+            name: "qid",
+            store: new RedisStore({
+                client: redisClient,
+                disableTouch: true,
+            }),
+            cookie:{
+                maxAge: 1000 * 60 * 60 * 3, // 3 hr
+                httpOnly: true,
+                sameSite: "lax", // csrf
+                secure: __production__ // cookie only works in https
+            },
+            saveUninitialized: false,// create session by default
+
+            secret: "daidaidashixiong",
+            resave: false,
+        })
+    )
+
     const apolloServer = new ApolloServer({
         schema: await buildSchema({
             resolvers: [HelloResolver,PostResolver,UserResolver],
             validate: false
         }),
-        context: ()=> ({
-            em: orm.em
+        context: ({req, res }): MyContext => ({
+            em: orm.em,
+            req,
+            res,
         })
     })    
 
