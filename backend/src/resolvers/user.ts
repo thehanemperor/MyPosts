@@ -2,6 +2,7 @@ import { Resolver, Query, Mutation, Arg, InputType, Field, Ctx, ObjectType } fro
 import { MyContext } from "src/types";
 import { User } from '../entities/User'
 import argon2 from "argon2"
+import {EntityManager} from '@mikro-orm/postgresql'
 
 @InputType()
 class UsernamePasswordInput {
@@ -52,7 +53,7 @@ export class UserResolver {
             if (options.username.length<= 2){
                 return {
                     errors:[{
-                        field:"Username",
+                        field:"username",
                         message:"Username should be greater than 2"
                     }]
                 }
@@ -60,7 +61,7 @@ export class UserResolver {
             if (options.password.length<= 2){
                 return {
                     errors:[{
-                        field:"Password",
+                        field:"password",
                         message:"Password should be greater than 2"
                     }]
                 }
@@ -68,9 +69,16 @@ export class UserResolver {
 
 
             const hashedPassword = await argon2.hash(options.password)
-            const user = em.create(User, {username: options.username, password: hashedPassword})
+            let user;
             try{
-                await em.persistAndFlush(user)
+                const result= await (em as EntityManager).createQueryBuilder(User).getKnexQuery().insert({
+                    username: options.username, 
+                    password: hashedPassword,
+                    created_at: new Date(),
+                    updated_at: new Date()       
+                }).returning("*")
+                user = result[0]
+
             }catch(err){
                 if (err.code === '23505'){
                     console.log('duplicated username',err.code)
@@ -92,6 +100,7 @@ export class UserResolver {
             
         // auto login after regiter
         req.session!.userId = user.id
+        console.log('create user',user)
         return { user }
     }
 
